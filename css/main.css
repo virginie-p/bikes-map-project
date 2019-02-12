@@ -155,7 +155,7 @@ canvas {
 #signatureZone {
   margin-top: 15px; }
 
-#buttons-canvas {
+#canvas-buttons {
   display: flex;
   justify-content: space-between;
   width: 95%; }

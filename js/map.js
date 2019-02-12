@@ -24,7 +24,6 @@ $(function(){
     }
 
     function displayStations(reponse) {
-        console.log('appel ajaxGet');
         stationsData = JSON.parse(reponse);
 
         let regex = /[A-Za-záàâäãåçéèêëíìîïñóòôöõúùûüýÿæœÁÀÂÄÃÅÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝŸÆŒ]+ ?[A-Za-záàâäãåçéèêëíìîïñóòôöõúùûüýÿæœÁÀÂÄÃÅÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝŸÆŒ]* ?[A-Za-záàâäãåçéèêëíìîïñóòôöõúùûüýÿæœÁÀÂÄÃÅÇÉÈÊËÍÌÎÏÑÓÒÔÖÕÚÙÛÜÝŸÆŒ]*/;
@@ -32,7 +31,7 @@ $(function(){
         let stationsList = stationsData.map(function(cityStation){
             let position = JSON.parse(`[${cityStation.position.lng},${cityStation.position.lat}]`);
             let name = cityStation.name.match(regex);
-            let id = cityStation.name.substring(0,6);
+            let id = cityStation.name.substring(1,6);
             let address = cityStation.address;
             let places = cityStation.bike_stands;
             let availableBikes = cityStation.available_bikes;
@@ -55,8 +54,8 @@ $(function(){
         });
     
         //Create Station Object
-        let station = {
-            init: function (name, id, coordinates, status, address, places, bikes){
+        class Station {
+            constructor (name, id, coordinates, status, address, places, bikes){
                 this.name = name;
                 this.id = id;
                 this.coordinates = coordinates;
@@ -64,11 +63,11 @@ $(function(){
                 this.address = address;
                 this.places = places;
                 this.bikes = bikes;
-            },
-            addPointToMap: function(){
+            }
+            addPointToMap(elementClass){
                 let el = document.createElement('div');
                 el.id = this.id;
-                el.className = 'stations iconNormal';
+                el.className = `${elementClass} iconNormal`;
                 el.style.backgroundImage = 'url(img/pin.png)';
                 el.style.backgroundSize= 'contain';
 
@@ -76,262 +75,99 @@ $(function(){
                 new mapboxgl.Marker(el)
                 .setLngLat(this.coordinates)
                 .addTo(map);
-            }
-        }
+                
+                //Change the cursor to pointer on mouseenter
+                $(`.${elementClass}`).on('mouseenter', function (e) {
+                    e.target.style.cursor = 'pointer';
+                });
 
-        let stations = [];
-        
-        //For each retrieved Data, add to Array and to Map
-        stationsList.forEach(function(index){
-            let stat = Object.create(station);
-            stat.init(index.properties.name, index.properties.id, index.geometry.coordinates, index.properties.status, index.properties.address, index.properties.places, index.properties.bikes);
-            stations.push(stat);
-            stat.addPointToMap();
-        });
-
-        //Change the cursor to pointer on mouseenter
-        $('.stations').on('mouseenter', function (e) {
-            e.target.style.cursor = 'pointer';
-        });
-
-        // Change it back to a pointer when it leaves
-        $('.stations').on('mouseleave', function (e) {
-            e.target.style.cursor = '';
-        });
-
-        //Create station div content
-        $(document).on('click', '.stations', createStationDiv);
-
-        function createStationDiv(e) {
-            $('#info').remove();
-            $('.iconZoom').addClass('iconNormal').removeClass('iconZoom');
-    
-            let clickedStation = e.target.id;
-
-            console.log(clickedStation);
-
-            $(clickedStation).addClass('iconZoom').removeClass('iconNormal');
-    
-            let stationInfo = stations.find(function(element){
-                return element.id == clickedStation;
-            });
-    
-            displayStationInfo();
-    
-            displayStationStatus();
-    
-            if (window.innerWidth <= 750) {
-                let $target = $('html, body');
-                $target.animate({scrollTop: $('#info').offset().top}, 2000);
-                $('.page').height('100%');
-            }
-            
-            //Create booking form fields
-            if (stationInfo.bikes >= 1) {
-            let formName = $('<h3>').text('Réservez votre vélo');
-            let userLastname = $('<div class="lastname"><label for="lastname">Nom :</label><input type="text" name="lastname" required></div>');
-            let userFirstname = $('<div class="firstname"><label for="firstname">Prénom :</label><input type="text" name="firstname" required></div>');
-            let bookingButton = $('<input id="booking-button" type="button" value="Réserver">')
-            $('#booking-form').append(formName, userLastname, userFirstname, bookingButton);
+                // Change it back to a pointer when it leaves
+                $(`.${elementClass}`).on('mouseleave', function (e) {
+                    e.target.style.cursor = '';
+                });
             }
 
             //Creating status info for the station
-            function displayStationInfo() {
-                $('.bike-booking').append('<div id="info">');
-        
+            displayStationInfo(idInfo, idForm) {
+                $('.bike-booking').append(`<div id=${idInfo}>`);
+
                 let titleElem = '<h3>';
                 let contentElem = '<p>';
-        
-                let name = $('<h2 class ="station-name">').text(stationInfo.name);
+
+                console.log(this.address);
+
+                let name = $('<h2 class ="station-name">').text(this.name);
                 let addressTitle = $(titleElem).text('Adresse de la station');
-                let address = $(contentElem).text(stationInfo.address);
+                let address =  $(contentElem).text(this.address);
                 let placesTitle = $(titleElem).text('Nombre de places de parking');
-                let places = $(contentElem).text(stationInfo.places);
+                let places = $(contentElem).text(this.places)
                 let bikesTitle = $(titleElem).text('Nombre de vélos disponibles');
-                let bikes = $(contentElem).text(stationInfo.bikes);
-                let form = $('<form id="booking-form">');
-        
-                $('#info').append(name, addressTitle, address, placesTitle, places, bikesTitle, bikes, form);
-            }
-        
-            //Displaying station status in the div #info
-            function displayStationStatus() {
-                let status;
-                if (stationInfo.status == "OPEN") {
-                    status = $('<h4>').text("La station est actuellement ouverte").css('color', 'green');
-                } else if (stationInfo.status == "CLOSE") {
-                    status = $('<h4>').text("La station est actuellement fermée").css('color', 'red');
+                let bikes = $(contentElem).text(this.bikes);
+                let form = $(`<form id=${idForm}>`);
+
+                $(`#${idInfo}`).append(name, addressTitle, address, placesTitle, places, bikesTitle, bikes, form);
+
+                //Create booking form fields
+                if (this.bikes >= 1) {
+                    let formName = $('<h3>').text('Réservez votre vélo');
+                    let userLastname = $('<div class="lastname"><label for="lastname">Nom :</label><input type="text" name="lastname" required></div>');
+                    let userFirstname = $('<div class="firstname"><label for="firstname">Prénom :</label><input type="text" name="firstname" required></div>');
+                    let bookingButton = $('<input id="booking-button" type="button" value="Réserver">')
+                    $('#booking-form').append(formName, userLastname, userFirstname, bookingButton);
                 }
+
+                //Automatic scroll to the #info div when user is on a mobile phone
+                if (window.innerWidth <= 750) {
+                    let target = $('html, body');
+                    target.animate({scrollTop: $(`#${idInfo}`).offset().top}, 2000);
+                    $('.page').height('100%');
+                }
+            }
+
+            //Displaying station status in the div #info
+            displayStationStatus() {
+                let status = this.status == "OPEN" ? (
+                    $('<h4>').text("La station est actuellement ouverte").css('color', 'green')
+                ) : ( 
+                    $('<h4>').text("La station est actuellement fermée").css('color', 'red')
+                );
                 $(status).insertAfter('.station-name');
             }
-        }
-    
-    }
-
-    
-
-    //Create signature zone when the user clicks on the booking button
-    $(document).on('click','#booking-button', function() {
-        let validation;
-
-        //Verify form fields and display signature zone if fields are filled
-        formFieldsValidation();
-
-        if (validation == true){
-            displaySignatureZone();
-        }
-
-        window.addEventListener('resize', setDimensionsCanvas);
-
-        //Init Canvas signature-like zone
-        let can = document.getElementById('signatureZone');
-        let ctx = can.getContext("2d");
         
-        drawSignature();
+        }
 
-        //Function to erase the canvas div
-        $('#clearSignature').on('click', erase);
+        let stations = []
 
-        $('#bookingConfirmation').on('click', saveFormData);
+        //For each retrieved Data, add to Array and to Map
+        stationsList.forEach(function(index){
+            let stat = new Station (
+                index.properties.name, 
+                index.properties.id, 
+                index.geometry.coordinates, 
+                index.properties.status, 
+                index.properties.address,
+                index.properties.places,
+                index.properties.bikes
+            );
+            stations.push(stat);
+            stat.addPointToMap('stations');
+        });
 
-        function drawSignature() {
-            let draw;
+        $(document).on('click', '.stations', function(e){
+            let stat = stations.find(function(element){
+                return element.id == e.target.id;
+            });
+
+            let idDiv = 'info';
+            $(`#${idDiv}`).remove();
             
-            $('#signatureZone').mousedown(function(e){
-                ctx.strokeStyle = "green";
-                ctx.lineCap = "round";
-                ctx.lineWidth = 6;
-                ctx.lineJoin = "round";
-
-                draw = true;
-                ctx.beginPath();
-                ctx.moveTo(e.offsetX, e.offsetY);
-            });
-
-            $('#signatureZone').mouseup(function(){
-                draw = false;
-                return draw;
-            });
-
-            $('#signatureZone').mousemove(function(e){
-                if (draw == true){
-                    ctx.lineTo(e.offsetX, e.offsetY);
-                    ctx.stroke();
-                }
-            });
-
-            $('#signatureZone').mouseleave(function(){
-                draw = false;
-                return draw;
-            });
-
-            //Mobile version 
-            can.addEventListener('touchstart', function(e){
-                console.log('enter touchstart');
-                draw = true;
-                ctx.beginPath();
-                ctx.moveTo(e.offsetX, e.offsetY);
-            });
-
-            can.addEventListener('touchmove', function(e){
-                if (draw == true){
-                    ctx.lineTo(e.offsetX, e.offsetY);
-                    ctx.stroke();
-                }
-            });
-
-            can.addEventListener('touchend', function(){
-                draw = false;
-                return draw;
-            });
-        }
-            //Function to clear the canvas
-        function erase() {
-            ctx.clearRect(0, 0, can.width, can.height);
-        }
-
-        function displaySignatureZone() {
-
-            $('#booking-form').append($('<div id="signature">'));
-
-            let closeIcon = $('<i class="fas fa-times" id="close">');
-            let canvas = $('<canvas id="signatureZone">');
-            let confirmBooking = $('<input id="bookingConfirmation" type="submit" value="Confirmer la réservation">');
-            let eraseSignature = $('<input id="clearSignature" type="button" value="Effacer la signature">');
-            let divButtons =  $('<div id="buttons-canvas">').append(confirmBooking, eraseSignature);
-
-            $('#signature').append(closeIcon, canvas, divButtons)
-            
-            if (window.innerWidth <= 750) {
-                $('#signature').animate({
-                    width: '345px',
-                    height: '200px',
-                    opacity:'1'
-                }, setDimensionsCanvas);
-            } if (window.innerWidth > 750) {
-                $('#signature').animate({
-                    width: '400px',
-                    height: '250px',
-                    opacity:'1'
-                }, setDimensionsCanvas);
-            }
-            
-        }
-
-        function setDimensionsCanvas() {
-            let signZone = document.getElementById('signatureZone');
-            let canvasDimension = signZone.getBoundingClientRect();
-
-            signZone.width = canvasDimension.width;
-            signZone.height = canvasDimension.height;
-
-        }
-
-        //Function to check if the fields of the form are filled before displaying the signature zone
-        function formFieldsValidation() {
-            $('.error-message').remove();
-
-            let lastnameField =  $('.lastname > input').val().trim().length;
-            let firstnameField = $('.firstname > input').val().trim().length;
-            let errorMessage = $('<p class="error-message">').text('Merci de renseigner l\'ensemble des champs pour continuer').css('color', 'red');
-
-
-            if ((lastnameField == 0) || (firstnameField == 0)){
-                $(errorMessage).insertBefore('#booking-button');
-                validation = false;
-            } else {
-                validation = true;
-            }
-
-            return validation;
-        }
-
-        function createBooking() {
-            let lastname = localStorage.setItem("lastname", $('.lastname').value());
-            let firstname = localStorage.setItem("firstname", $('.firsname').value());
-
-            let signatureImg = new Image();
-            signatureImg.src = signatureZone.toDataURL();
-
-            let signature = localStorage.setItem("signature", signatureImg);
-
-
-            
-        }
-    });
+           //Display a bigger icon for the station after a click on the marker
+            $('.iconZoom').addClass('iconNormal').removeClass('iconZoom');
+            $(`#${e.target.id}`).addClass('iconZoom').removeClass('iconNormal');
     
-
-    //Functions to close the signature div
-    $(document).on('click', '#close', function(){
-        $('#signature').remove();
-    });
-
-    $(document).mouseup(function (e) {
-        if (!$('#signature').is(e.target) // if the target of the click isn't the container...
-        && $('#signature').has(e.target).length === 0) // ... nor a descendant of the container
-        {
-            $('#signature').remove();
-        }
-    });
-    
+            stat.displayStationInfo(idDiv, 'booking-form');
+            stat.displayStationStatus();
+        });
+           
+    }
 });
